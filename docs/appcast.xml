@@ -1,0 +1,46 @@
+<?xml version="1.0" standalone="yes"?>
+<rss xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle" version="2.0">
+    <channel>
+        <title>Milktoast</title>
+        <item>
+            <title>1.0.0</title>
+            <pubDate>Sat, 26 Sep 2026 11:11:58 -0400</pubDate>
+            <sparkle:version>3</sparkle:version>
+            <sparkle:shortVersionString>1.0.0</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+            <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
+            <description><![CDATA[<h2>Matroska files now play in QuickTime Player.</h2>
+
+<p>Open an <code>.mkv</code> and Milktoast rewraps its streams into a
+QuickTime-compatible movie without re-encoding them, then hands it to QuickTime
+Player &mdash; so playback, AirPlay, Picture in Picture, and the track menus are
+all the ones you already know. A 2.3&nbsp;GB episode is ready in under two
+seconds.</p>
+
+<ul>
+  <li><strong>HEVC files that used to play black now play.</strong> Matroska
+      carries HEVC untagged; Milktoast re-tags it <code>hvc1</code>, the sample
+      entry QuickTime actually renders.</li>
+  <li><strong>Soundtracks survive.</strong> DTS, TrueHD, Opus, and Vorbis are
+      converted while keeping their surround channels &mdash; 5.1 stays 5.1
+      rather than folding to stereo. FLAC stays lossless as ALAC.</li>
+  <li><strong>Nothing gets left behind.</strong> Every audio track keeps its
+      language and default flag, chapters come along, and text subtitles become
+      selectable tracks in QuickTime&rsquo;s Subtitles menu.</li>
+  <li><strong>The prepared movie lands next to the original.</strong>
+      <code>Episode.mkv</code> gets an <code>Episode.mp4</code> beside it. A file
+      Milktoast did not create is never overwritten, and your original is only
+      ever read.</li>
+  <li><strong>Opening the same file again is instant.</strong></li>
+  <li><strong>It asks for nothing.</strong> No network access, no analytics, no
+      Automation permission, and no blanket file access.</li>
+  <li><strong>ffmpeg is bundled</strong>, so there is nothing else to
+      install.</li>
+</ul>
+
+<p>Requires macOS 14 or later. Signed and notarized.</p>
+]]></description>
+            <enclosure url="https://github.com/binoio/milktoast/releases/download/v1.0.0/Milktoast-1.0.0.zip" length="19410253" type="application/octet-stream" sparkle:edSignature="WNY7QZinzerd5gW8tVkVmCAWFD2Hw3MiCkqnUJA+deel7clbBM+889KyqV4aQBfvgG4zVi/+ueZTS6vnKDMkBA=="/>
+        </item>
+    </channel>
+</rss>

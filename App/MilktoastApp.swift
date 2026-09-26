@@ -5,6 +5,9 @@ import MilktoastCore
 struct MilktoastApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     @State private var model = AppModel()
+    #if canImport(Sparkle)
+    @StateObject private var updater = UpdaterModel()
+    #endif
 
     var body: some Scene {
         Window("Milktoast", id: "main") {
@@ -13,6 +16,12 @@ struct MilktoastApp: App {
         }
         .windowResizability(.contentSize)
         .commands {
+            #if canImport(Sparkle)
+            CommandGroup(after: .appInfo) {
+                Button("Check for Updates…") { updater.checkForUpdates() }
+                    .disabled(!updater.canCheckForUpdates)
+            }
+            #endif
             CommandGroup(replacing: .newItem) {
                 Button("Open Movie…") { model.presentOpenPanel() }
                     .keyboardShortcut("o")

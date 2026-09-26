@@ -5,9 +5,9 @@
 // inset margin, no baked-in shadow. Anything drawn near a corner is clipped by
 // the mask, so the character stays inside the safe inner region.
 //
-// Design: a cheerful slice of toast standing in a pool of milk. The app is
-// deliberately mild — it does one small thing and gets out of the way — and the
-// icon says so.
+// Design: a cheerful, plain slice of toast standing in a pool of milk. The app
+// is deliberately mild — it does one small thing and gets out of the way — and
+// the icon says so.
 //
 // Usage: swift Scripts/generate_icon.swift <output-directory>
 
@@ -36,8 +36,6 @@ enum Palette {
     static let crustDark  = hex(0xA9, 0x63, 0x20)
     static let bread      = hex(0xF7, 0xD3, 0x8C)
     static let breadLight = hex(0xFD, 0xE8, 0xB8)
-    static let butter     = hex(0xFF, 0xE1, 0x6B)
-    static let butterEdge = hex(0xF0, 0xC0, 0x3A)
     static let ink        = hex(0x4A, 0x2C, 0x12)
     static let blush      = hex(0xF3, 0x93, 0x93, 0.55)
 }
@@ -165,34 +163,7 @@ func renderMaster(size: Int) -> CGImage {
     context.setLineWidth(s * 0.008)
     context.strokePath()
 
-    // 4. Pat of butter, slightly tilted, melting on top.
-    let butterSize = toastBox.width * 0.20
-    let butterRect = CGRect(
-        x: toastBox.midX - butterSize / 2,
-        y: toastBox.minY + toastBox.height * 0.66,
-        width: butterSize,
-        height: butterSize * 0.72
-    )
-    context.saveGState()
-    context.translateBy(x: butterRect.midX, y: butterRect.midY)
-    context.rotate(by: -0.18)
-    context.translateBy(x: -butterRect.midX, y: -butterRect.midY)
-    let butterPath = CGPath(
-        roundedRect: butterRect,
-        cornerWidth: butterSize * 0.18,
-        cornerHeight: butterSize * 0.18,
-        transform: nil
-    )
-    context.addPath(butterPath)
-    context.setFillColor(Palette.butter)
-    context.fillPath()
-    context.addPath(butterPath)
-    context.setStrokeColor(Palette.butterEdge)
-    context.setLineWidth(s * 0.006)
-    context.strokePath()
-    context.restoreGState()
-
-    // 5. Face. Dots and a simple arc read at 16pt; anything finer does not.
+    // 4. Face. Dots and a simple arc read at 16pt; anything finer does not.
     let eyeRadius = s * 0.021
     let eyeY = toastBox.minY + toastBox.height * 0.44
     let eyeOffset = toastBox.width * 0.20
@@ -231,7 +202,7 @@ func renderMaster(size: Int) -> CGImage {
     context.setLineCap(.round)
     context.strokePath()
 
-    // 6. Milk, drawn last so the toast sits in it rather than on it.
+    // 5. Milk, drawn last so the toast sits in it rather than on it.
     let milkHeight = s * 0.24
     context.saveGState()
     context.addPath(milkPath(width: s, height: milkHeight))

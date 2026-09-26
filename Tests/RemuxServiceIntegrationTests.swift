@@ -198,6 +198,8 @@ final class RemuxServiceIntegrationTests: XCTestCase {
     }
 
     func testAReadOnlyFolderFallsBackToTheCacheWithAWarning() async throws {
+        // Permission bits do not stop root, which is how the container runs.
+        try XCTSkipIf(geteuid() == 0, "running as root: directory permissions are not enforced")
         let tools = try requireTools()
         try await requireEncoders(["libx264", "aac"], tools)
 
@@ -364,6 +366,33 @@ final class RemuxServiceIntegrationTests: XCTestCase {
             survivors.contains { $0.contains("partial") },
             "the scratch file must be cleaned up: \(survivors)"
         )
+    }
+
+    func testTheStampSurvivesARoundTripOnThisFilesystem() throws {
+        // Everything about reusing a sidecar rests on this; a volume that cannot
+        // hold the attribute silently loses the ability to recognise our output.
+        let file = workspace.appendingPathComponent("stamped.bin")
+        try Data("x".utf8).write(to: file)
+
+        XCTAssertNil(FileStamp.read(at: file.path), "a fresh file carries no stamp")
+        guard FileStamp.write("abc123", at: file.path) else {
+            throw XCTSkip("this filesystem does not carry extended attributes")
+        }
+        XCTAssertEqual(FileStamp.read(at: file.path), "abc123")
+        XCTAssertTrue(FileStamp.write("def456", at: file.path), "a stamp can be replaced")
+        XCTAssertEqual(FileStamp.read(at: file.path), "def456")
+        XCTAssertTrue(FileStamp.canStamp(inDirectory: workspace))
+    }
+
+    func testStampProbeLeavesNothingBehind() throws {
+        let before = try FileManager.default.contentsOfDirectory(atPath: workspace.path)
+        _ = FileStamp.canStamp(inDirectory: workspace)
+        let after = try FileManager.default.contentsOfDirectory(atPath: workspace.path)
+        XCTAssertEqual(before.sorted(), after.sorted(), "the probe file must be cleaned up")
+    }
+
+    func testStampProbeSaysNoForADirectoryItCannotWriteTo() {
+        XCTAssertFalse(FileStamp.canStamp(inDirectory: URL(fileURLWithPath: "/no/such/directory")))
     }
 
     // MARK: - Helpers

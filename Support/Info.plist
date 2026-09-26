@@ -95,6 +95,12 @@
 	<false/>
 	<key>NSSupportsSuddenTermination</key>
 	<false/>
+	<key>SUEnableAutomaticChecks</key>
+	<true/>
+	<key>SUFeedURL</key>
+	<string>https://binoio.github.io/milktoast/appcast.xml</string>
+	<key>SUPublicEDKey</key>
+	<string>nDAE5HXFYg6pBQbAFtyEObXbHu9N7TM+7zUivRcRqNA=</string>
 	<key>UTImportedTypeDeclarations</key>
 	<array>
 		<dict>

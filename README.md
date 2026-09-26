@@ -122,8 +122,10 @@ Two rules make that safe:
   hidden scratch file in the same folder, which is renamed into place only after
   it exits cleanly.
 
-If the source folder is read-only — a mounted disc image, a locked share — the
-prepared movie goes to the cache instead and the job says so.
+The prepared movie goes to the cache instead, with the reason shown in the job
+detail, when the source folder is read-only (a mounted disc image, a locked
+share) or cannot keep extended attributes — without the stamp Milktoast could
+not recognise its own file there and would add another copy on every open.
 
 Settings → Output can switch the destination to Milktoast's cache folder
 (`~/Library/Caches/io.bino.milktoast/remux/`), which keeps prepared copies out

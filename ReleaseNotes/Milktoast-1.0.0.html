@@ -1,0 +1,30 @@
+<h2>Matroska files now play in QuickTime Player.</h2>
+
+<p>Open an <code>.mkv</code> and Milktoast rewraps its streams into a
+QuickTime-compatible movie without re-encoding them, then hands it to QuickTime
+Player &mdash; so playback, AirPlay, Picture in Picture, and the track menus are
+all the ones you already know. A 2.3&nbsp;GB episode is ready in under two
+seconds.</p>
+
+<ul>
+  <li><strong>HEVC files that used to play black now play.</strong> Matroska
+      carries HEVC untagged; Milktoast re-tags it <code>hvc1</code>, the sample
+      entry QuickTime actually renders.</li>
+  <li><strong>Soundtracks survive.</strong> DTS, TrueHD, Opus, and Vorbis are
+      converted while keeping their surround channels &mdash; 5.1 stays 5.1
+      rather than folding to stereo. FLAC stays lossless as ALAC.</li>
+  <li><strong>Nothing gets left behind.</strong> Every audio track keeps its
+      language and default flag, chapters come along, and text subtitles become
+      selectable tracks in QuickTime&rsquo;s Subtitles menu.</li>
+  <li><strong>The prepared movie lands next to the original.</strong>
+      <code>Episode.mkv</code> gets an <code>Episode.mp4</code> beside it. A file
+      Milktoast did not create is never overwritten, and your original is only
+      ever read.</li>
+  <li><strong>Opening the same file again is instant.</strong></li>
+  <li><strong>It asks for nothing.</strong> No network access, no analytics, no
+      Automation permission, and no blanket file access.</li>
+  <li><strong>ffmpeg is bundled</strong>, so there is nothing else to
+      install.</li>
+</ul>
+
+<p>Requires macOS 14 or later. Signed and notarized.</p>

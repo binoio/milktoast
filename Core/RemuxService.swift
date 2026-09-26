@@ -123,6 +123,12 @@ public struct RemuxService: Sendable {
         if placement == .besideSource, !FileManager.default.isWritableFile(atPath: folder.path) {
             placement = .cache
             placementWarning = "\(folder.lastPathComponent) is not writable — kept the prepared movie in Milktoast's cache instead."
+        } else if placement == .besideSource, !FileStamp.canStamp(inDirectory: folder) {
+            // Without the marker, the next run could not tell this movie apart
+            // from one the user put there, and would add another copy alongside
+            // it every time.
+            placement = .cache
+            placementWarning = "\(folder.lastPathComponent) does not keep extended attributes, so Milktoast could not recognise its own file there — kept the prepared movie in its cache instead."
         }
 
         // Fast path: a finished movie for this exact source and these exact

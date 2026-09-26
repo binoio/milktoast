@@ -1,0 +1,4 @@
+module CXattr [system] {
+    header "shim.h"
+    export *
+}

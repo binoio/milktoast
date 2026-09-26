@@ -14,6 +14,7 @@ RUN apt-get update \
 WORKDIR /package
 
 COPY Package.swift ./
+COPY CXattr ./CXattr
 COPY Core ./Core
 COPY CLI ./CLI
 COPY Tests ./Tests

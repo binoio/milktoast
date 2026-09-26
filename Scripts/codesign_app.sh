@@ -19,11 +19,28 @@ ENTITLEMENTS="$REPO_ROOT/Support/Milktoast.entitlements"
 
 CODESIGN_FLAGS=(--force --options runtime --timestamp -s "$IDENTITY")
 
+SPARKLE_FRAMEWORK="$APP_BUNDLE/Contents/Frameworks/Sparkle.framework"
+
 # Strip quarantine and any resource forks Finder may have added; they make
 # codesign fail with "resource fork, Finder information, or similar detritus".
 xattr -cr "$APP_BUNDLE"
 
-echo "Step 1/3: Signing bundled FFmpeg libraries..."
+echo "Step 1/4: Signing Sparkle.framework..."
+if [[ -d "$SPARKLE_FRAMEWORK" ]]; then
+    # Sparkle's helpers are separately signed executables; its XPC services keep
+    # the entitlements they shipped with.
+    codesign "${CODESIGN_FLAGS[@]}" "$SPARKLE_FRAMEWORK/Versions/B/Autoupdate"
+    codesign "${CODESIGN_FLAGS[@]}" "$SPARKLE_FRAMEWORK/Versions/B/Updater.app"
+    codesign "${CODESIGN_FLAGS[@]}" --preserve-metadata=entitlements \
+        "$SPARKLE_FRAMEWORK/Versions/B/XPCServices/Installer.xpc"
+    codesign "${CODESIGN_FLAGS[@]}" --preserve-metadata=entitlements \
+        "$SPARKLE_FRAMEWORK/Versions/B/XPCServices/Downloader.xpc"
+    codesign "${CODESIGN_FLAGS[@]}" "$SPARKLE_FRAMEWORK"
+else
+    echo "          not embedded; skipping"
+fi
+
+echo "Step 2/4: Signing bundled FFmpeg libraries..."
 libs=("$APP_BUNDLE"/Contents/Frameworks/*.dylib(N))
 if (( ${#libs} )); then
     for lib in $libs; do
@@ -34,7 +51,7 @@ else
     echo "          none embedded; skipping"
 fi
 
-echo "Step 2/3: Signing helper executables..."
+echo "Step 3/4: Signing helper executables..."
 helpers=("$APP_BUNDLE"/Contents/Helpers/*(N))
 if (( ${#helpers} )); then
     for helper in $helpers; do
@@ -45,7 +62,7 @@ else
     echo "          none embedded; skipping"
 fi
 
-echo "Step 3/3: Signing app bundle with entitlements..."
+echo "Step 4/4: Signing app bundle with entitlements..."
 codesign "${CODESIGN_FLAGS[@]}" --entitlements "$ENTITLEMENTS" "$APP_BUNDLE"
 
 echo "Code signing complete (inner-to-outer)."

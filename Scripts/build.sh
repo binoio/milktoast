@@ -54,6 +54,17 @@ fi
 BUILD_NUMBER="$(git -C "$ROOT" rev-list --count HEAD 2>/dev/null || echo 1)"
 /usr/libexec/PlistBuddy -c "Set :CFBundleVersion $BUILD_NUMBER" "$APP/Contents/Info.plist"
 
+# Embed Sparkle.framework (the executable links it via @rpath/../Frameworks).
+SPARKLE_FRAMEWORK="$(find "$ROOT/.build" -type d -name "Sparkle.framework" -path "*artifacts*" -not -path "*dSYM*" | head -1)"
+if [[ -n "$SPARKLE_FRAMEWORK" ]]; then
+  mkdir -p "$APP/Contents/Frameworks"
+  rm -rf "$APP/Contents/Frameworks/Sparkle.framework"
+  # ditto preserves the framework's Versions symlink structure; cp -R would not.
+  ditto "$SPARKLE_FRAMEWORK" "$APP/Contents/Frameworks/Sparkle.framework"
+else
+  echo "    (Sparkle.framework not found under .build — run 'swift build' first)"
+fi
+
 # App icon (regenerate with Scripts/generate_icon.sh).
 if [[ -f "$ROOT/Support/Icons/AppIcon.icns" ]]; then
   cp "$ROOT/Support/Icons/AppIcon.icns" "$APP/Contents/Resources/AppIcon.icns"

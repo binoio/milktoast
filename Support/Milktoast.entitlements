@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!--
+	  Milktoast is deliberately not sandboxed. It has to spawn ffmpeg and read whatever
+	  movie the user double-clicked in Finder; a sandboxed parent cannot pass its
+	  file-access grants down to a child process, so every playback would fail.
+
+	  Library validation is disabled because the bundled ffmpeg loads the FFmpeg
+	  dylibs copied in beside it. Scripts/build.sh re-signs those with the same
+	  identity, but this keeps ad-hoc development builds working too.
+	-->
+	<key>com.apple.security.cs.disable-library-validation</key>
+	<true/>
+</dict>
+</plist>

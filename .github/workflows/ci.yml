@@ -1,0 +1,16 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  core-tests:
+    name: Remux engine test suite (Linux container)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Build test image
+        run: docker build -t milktoast-tests .
+      - name: Run tests
+        run: docker run --rm milktoast-tests

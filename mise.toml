@@ -1,0 +1,23 @@
+# Toolchain pin for local development. `mise install` then `mise run test`.
+[tools]
+swift = "6.1"
+
+[tasks.build]
+description = "Build Milktoast.app"
+run = "./Scripts/build.sh"
+
+[tasks.run]
+description = "Build and launch Milktoast.app"
+run = "./Scripts/run.sh"
+
+[tasks.test]
+description = "Run the test suite natively"
+run = "./Scripts/test.sh"
+
+[tasks.test-docker]
+description = "Run the engine test suite in a Linux container"
+run = "./Scripts/test.sh --docker"
+
+[tasks.icon]
+description = "Regenerate the app icon"
+run = "./Scripts/generate_icon.sh"

@@ -1,0 +1,6 @@
+.build/
+build/
+dist/
+.git/
+*.app
+Support/Icons/

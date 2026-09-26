@@ -1,0 +1,14 @@
+services:
+  tests:
+    build: .
+    image: milktoast-tests
+    command: ["swift", "test"]
+
+  # One-off remux from the command line without installing anything locally:
+  #   docker compose run --rm milktoast --plan /movies/Example.mkv
+  milktoast:
+    build: .
+    image: milktoast-tests
+    entrypoint: ["swift", "run", "-c", "release", "milktoastcli"]
+    volumes:
+      - ${MOVIES_DIR:-./}:/movies

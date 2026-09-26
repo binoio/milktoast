@@ -134,42 +134,6 @@
             color: var(--secondary);
         }
 
-        /* The one thing worth showing: an .mkv is simply not openable, and then
-           it is. Both panes quote real output. */
-        .proof {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-            gap: 20px;
-            margin: 20px 0 70px;
-        }
-        .proof-pane {
-            background: var(--code-bg);
-            border: 1px solid var(--border);
-            border-radius: var(--radius);
-            padding: 22px 24px;
-        }
-        .proof-pane h3 {
-            margin: 0 0 14px;
-            font-size: 0.82rem;
-            font-weight: 650;
-            letter-spacing: 0.06em;
-            text-transform: uppercase;
-            color: var(--secondary);
-        }
-        .proof-pane.after h3 { color: var(--accent); }
-        .proof-pane pre {
-            margin: 0;
-            font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace;
-            font-size: 0.82rem;
-            line-height: 1.6;
-            white-space: pre-wrap;
-            word-break: break-word;
-            color: var(--fg);
-        }
-        .proof-pane .muted { color: var(--secondary); }
-        .proof-pane .bad { color: #d93025; }
-        .proof-pane .good { color: #1a9c5b; }
-
         .features {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
@@ -193,12 +157,6 @@
 
         @media (prefers-reduced-motion: reduce) {
             .feature-card, .feature-card:hover, .cta:hover { transition: none; transform: none; }
-        }
-
-        .feature-icon {
-            font-size: 2.5rem;
-            margin-bottom: 20px;
-            display: block;
         }
 
         .feature-card h3 {
@@ -276,7 +234,7 @@
         <header>
             <img class="hero-icon" src="icon.png" alt="Milktoast app icon">
             <h1>Milktoast</h1>
-            <p class="subtitle">Mild by design. Milktoast rewraps Matroska files so QuickTime Player can play them — no re-encoding, no new player to learn.</p>
+            <p class="subtitle">Rewraps Matroska files so QuickTime can play them, fast.</p>
             <div class="cta-container">
                 <a href="https://github.com/binoio/milktoast/releases/latest" class="cta" id="download-btn">Download for macOS</a>
                 <span class="version-info">Requires macOS 14.0 or later &bull; <span id="version-number">free and open source</span></span>
@@ -304,60 +262,22 @@
             updateDownloadLink();
         </script>
 
-        <section class="proof">
-            <div class="proof-pane">
-                <h3>An .mkv, handed to macOS</h3>
-<pre><span class="muted">$ open Episode.mkv</span>
-<span class="bad">isPlayable: false</span>
-<span class="muted">AVFoundationErrorDomain Code=-11828
-"Cannot Open"
-This media format is not supported.</span></pre>
-            </div>
-            <div class="proof-pane after">
-                <h3>The same file, after Milktoast</h3>
-<pre><span class="muted">$ open Episode.mkv</span>
-<span class="good">isPlayable: true</span>
-<span class="muted">video: hvc1
-audio: alac
-subtitles: tx3g</span>
-<span class="muted">ready in 1.7s</span></pre>
-            </div>
-        </section>
-
         <section class="features">
             <div class="feature-card">
-                <span class="feature-icon">🍞</span>
                 <h3>Ready in Seconds</h3>
-                <p>A 2.3 GB, hour-long episode is ready in under two seconds. The streams are copied, not re-encoded — it runs at the speed of your disk.</p>
+                <p>Streams are copied, not re-encoded.</p>
             </div>
             <div class="feature-card">
-                <span class="feature-icon">📺</span>
                 <h3>QuickTime Does the Playing</h3>
-                <p>AirPlay, Picture in Picture, media keys, trimming, and the track menus are all the native ones you already know. Milktoast gets out of the way.</p>
+                <p>AirPlay, Picture in Picture, media keys, trimming, and the track menus are all the native ones you already know.</p>
             </div>
             <div class="feature-card">
-                <span class="feature-icon">🎚️</span>
-                <h3>Only Converts What It Must</h3>
-                <p>HEVC is re-tagged so it stops playing black. DTS and TrueHD keep their surround channels. FLAC stays lossless as ALAC. Everything else is copied untouched.</p>
-            </div>
-            <div class="feature-card">
-                <span class="feature-icon">💬</span>
                 <h3>Nothing Gets Left Behind</h3>
                 <p>Every audio track keeps its language and default flag, chapters come along, and text subtitles become selectable tracks in QuickTime's Subtitles menu.</p>
             </div>
-            <div class="feature-card">
-                <span class="feature-icon">⚡</span>
-                <h3>Right Beside the Original</h3>
-                <p>Episode.mkv gets an Episode.mp4 next to it, ready to open any time. A file Milktoast did not create is never overwritten — and your original is only ever read.</p>
-            </div>
-            <div class="feature-card">
-                <span class="feature-icon">🔒</span>
-                <h3>Asks For Nothing</h3>
-                <p>No network access, no analytics, no Automation permission, and no blanket file access — opening a movie from Finder is all the permission it needs.</p>
-            </div>
         </section>
 
-        <h2 class="section-title">It tells you what it did</h2>
+        <h2 class="section-title">Command line, too</h2>
         <p class="section-lede">Milktoast explains every decision it makes about your tracks, in the app and on the command line. Nothing happens to your original file.</p>
         <div class="terminal">
 <pre><span class="prompt">$</span> milktoast --plan Episode.mkv

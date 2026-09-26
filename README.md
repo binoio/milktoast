@@ -60,7 +60,7 @@ To make Milktoast the default for Matroska files: select one in Finder, press �
 * Double-click an `.mkv`, or drag one onto Milktoast, or drop one on its window.
 * A progress window appears; it explains every decision it made about your
   tracks. Once QuickTime starts playing, Milktoast quits.
-* Opening the same file again is instant — the prepared movie is still cached.
+* Opening the same file again is instant — the prepared movie is still there.
 
 Nothing has to happen automatically. Settings → Playback offers **"Just prepare
 it — I'll open it myself"**, which stops after the remux and leaves the job row
@@ -78,6 +78,7 @@ From the command line:
 milktoast Movie.mkv              # prepare and play
 milktoast --plan Movie.mkv       # show what would happen; touches nothing
 milktoast --remux-only Movie.mkv # prepare and print the path
+milktoast --output cache         # keep it in the cache instead of beside the source
 milktoast --cache-info           # where the cache is and how big it is
 milktoast --clear-cache
 ```
@@ -103,28 +104,38 @@ as a legacy `text` track, which QuickTime burns over the picture whether or not
 the source had subtitles enabled. MP4 writes a real `sbtl` track, which lands in
 the Subtitles menu and stays off until asked. QuickTime Player opens both.
 
-### The cache
+### Where the prepared movie goes
 
-Prepared movies live in `~/Library/Caches/io.bino.milktoast/remux/<key>/`, where
-the key hashes the source's name, size, and modification time together with the
-settings that affect output. Editing or replacing a file invalidates its entry;
-sub-second timestamp jitter from a copy tool does not. A completion marker is
-written only after ffmpeg exits cleanly, so an interrupted job is never played.
+By default it lands **next to the original**: `Episode.mkv` gets an
+`Episode.mp4` beside it. It stays there — Milktoast never deletes it — so you
+can add it to a library, copy it to a device, or open it again months later.
 
-**They are cleaned up for you.** Eviction runs at launch, before each remux, and
-again once the queue drains. It removes partial leftovers first, then anything
-past the age limit, then least-recently-used entries until the size cap is met —
-7 days and 20 GB by default, both adjustable in Settings → Cache. The limits are
-deliberately modest: a cache hit saves a second or two, not minutes.
+Two rules make that safe:
 
-Two backstops cover the case where you prepare a movie and never open Milktoast
-again: the directory is under `~/Library/Caches`, which macOS reclaims on its
-own under disk pressure, and it is flagged `isExcludedFromBackup`, so
-multi-gigabyte derived files never reach Time Machine. To reclaim the space
-immediately, use Settings → Cache → Empty Cache Now, or `milktoast --clear-cache`.
+- **A file Milktoast did not create is never overwritten.** Every movie it
+  writes carries an extended attribute identifying the source and settings it
+  was built from. If `Episode.mp4` already exists and is not stamped as
+  Milktoast's, the output becomes `Episode (Milktoast).mp4` instead. If it *is*
+  stamped and still current, it is handed back instantly; if stamped but stale,
+  it is rebuilt in place.
+- **A half-written file never appears under the real name.** ffmpeg writes to a
+  hidden scratch file in the same folder, which is renamed into place only after
+  it exits cleanly.
 
-Your original `.mkv` is only ever read. Nothing is written next to it, and
-nothing is modified.
+If the source folder is read-only — a mounted disc image, a locked share — the
+prepared movie goes to the cache instead and the job says so.
+
+Settings → Output can switch the destination to Milktoast's cache folder
+(`~/Library/Caches/io.bino.milktoast/remux/`), which keeps prepared copies out
+of your movie folders. **That is the only mode with automatic cleanup**, and it
+is where the cleanup controls appear: a toggle plus size and age budgets
+(defaults 20 GB and 7 days). Turn the toggle off to keep prepared movies
+indefinitely — half-written leftovers are still collected, since they are
+unplayable by definition. The cache is excluded from Time Machine and macOS may
+reclaim it under disk pressure.
+
+Either way, your original `.mkv` is only ever read. Nothing is written into it
+and nothing is modified.
 
 ## Development
 
@@ -157,14 +168,14 @@ CI runs the whole suite in `swift:6.1-noble` with ffmpeg installed
 ### Distribution
 
 ```sh
-CODESIGN_IDENTITY="Developer ID Application: … (TEAMID)" \
-NOTARY_PROFILE=milktoast-notary \
-  ./Scripts/build_and_notarize.sh
+./Scripts/release.sh --dry-run   # build, sign, notarize, staple; stop short of publishing
+./Scripts/release.sh             # the full release
 ```
 
-produces a stapled `dist/Milktoast-<version>.zip` and `.dmg`. `Scripts/release.sh
-<version>` runs the tests, requires release notes, builds those artifacts, and
-tags the commit.
+`Scripts/release.sh` preflights the tree, runs the tests, builds and signs
+inside-out via `Scripts/codesign_app.sh`, notarizes and staples both a `.zip`
+and a `.dmg`, then tags and publishes the GitHub release. See
+[RELEASE.md](RELEASE.md) for prerequisites and the signing model.
 
 Milktoast is deliberately not sandboxed: a sandboxed parent cannot pass its
 file-access grants to a child process, so every ffmpeg run would fail. See the

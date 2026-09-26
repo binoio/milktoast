@@ -153,6 +153,96 @@ final class RemuxServiceIntegrationTests: XCTestCase {
         XCTAssertTrue(collector.sawFinish(), "the final progress=end block was missed")
     }
 
+    func testThePreparedMovieLandsBesideTheSource() async throws {
+        let tools = try requireTools()
+        try await requireEncoders(["libx264", "aac"], tools)
+
+        let source = try await makeMatroska(
+            named: "beside.mkv",
+            videoEncoder: "libx264",
+            audioEncoder: "aac",
+            tools: tools
+        )
+        let output = try await makeService(tools).remux(source: source) { _ in }
+
+        XCTAssertEqual(output.deletingLastPathComponent(), source.deletingLastPathComponent())
+        XCTAssertEqual(output.lastPathComponent, "beside.mp4")
+        XCTAssertTrue(FileManager.default.fileExists(atPath: output.path))
+        // The hidden scratch file is renamed into place, never left behind.
+        let leftovers = try FileManager.default
+            .contentsOfDirectory(atPath: workspace.path)
+            .filter { $0.contains("partial") }
+        XCTAssertTrue(leftovers.isEmpty, "found \(leftovers)")
+    }
+
+    func testAnUnrelatedFileWithTheObviousNameIsNeverOverwritten() async throws {
+        let tools = try requireTools()
+        try await requireEncoders(["libx264", "aac"], tools)
+
+        let source = try await makeMatroska(
+            named: "clash.mkv",
+            videoEncoder: "libx264",
+            audioEncoder: "aac",
+            tools: tools
+        )
+        // Something the user put there themselves.
+        let occupied = workspace.appendingPathComponent("clash.mp4")
+        let sacred = Data("do not touch".utf8)
+        try sacred.write(to: occupied)
+
+        let output = try await makeService(tools).remux(source: source) { _ in }
+
+        XCTAssertEqual(try Data(contentsOf: occupied), sacred, "an existing file must survive untouched")
+        XCTAssertEqual(output.lastPathComponent, "clash (Milktoast).mp4")
+        XCTAssertTrue(FileManager.default.fileExists(atPath: output.path))
+    }
+
+    func testAReadOnlyFolderFallsBackToTheCacheWithAWarning() async throws {
+        let tools = try requireTools()
+        try await requireEncoders(["libx264", "aac"], tools)
+
+        let locked = workspace.appendingPathComponent("locked", isDirectory: true)
+        try FileManager.default.createDirectory(at: locked, withIntermediateDirectories: true)
+        let source = locked.appendingPathComponent("readonly.mkv")
+        try FileManager.default.moveItem(
+            at: try await makeMatroska(named: "readonly.mkv", videoEncoder: "libx264", audioEncoder: "aac", tools: tools),
+            to: source
+        )
+        try FileManager.default.setAttributes([.posixPermissions: 0o500], ofItemAtPath: locked.path)
+        defer { try? FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: locked.path) }
+
+        var warnings: [String] = []
+        let output = try await makeService(tools).remux(source: source) { event in
+            if case .planned(let plan) = event { warnings = plan.warnings.map(\.message) }
+        }
+
+        XCTAssertNotEqual(output.deletingLastPathComponent(), locked)
+        XCTAssertTrue(output.path.contains("cache"), output.path)
+        XCTAssertTrue(
+            warnings.contains { $0.contains("not writable") },
+            "the fallback must be explained, got \(warnings)"
+        )
+    }
+
+    func testCacheModeKeepsMoviesOutOfTheSourceFolder() async throws {
+        let tools = try requireTools()
+        try await requireEncoders(["libx264", "aac"], tools)
+
+        let source = try await makeMatroska(
+            named: "cached-mode.mkv",
+            videoEncoder: "libx264",
+            audioEncoder: "aac",
+            tools: tools
+        )
+        let output = try await makeService(tools, location: .cache).remux(source: source) { _ in }
+
+        XCTAssertNotEqual(output.deletingLastPathComponent(), source.deletingLastPathComponent())
+        XCTAssertFalse(
+            FileManager.default.fileExists(atPath: workspace.appendingPathComponent("cached-mode.mp4").path),
+            "cache mode must leave the movie folder alone"
+        )
+    }
+
     func testSecondOpenOfTheSameFileReusesTheCachedRemux() async throws {
         let tools = try requireTools()
         try await requireEncoders(["libx264", "aac"], tools)
@@ -171,7 +261,7 @@ final class RemuxServiceIntegrationTests: XCTestCase {
         var analyzedAgain = false
         let second = try await service.remux(source: source) { event in
             switch event {
-            case .reusedCache: reused = true
+            case .reusedExisting: reused = true
             case .analyzing: analyzedAgain = true
             default: break
             }
@@ -207,10 +297,14 @@ final class RemuxServiceIntegrationTests: XCTestCase {
 
         var reused = false
         let second = try await service.remux(source: source) { event in
-            if case .reusedCache = event { reused = true }
+            if case .reusedExisting = event { reused = true }
         }
         XCTAssertFalse(reused, "a replaced source must be re-remuxed")
-        XCTAssertNotEqual(first, second, "the new content hashes to a different cache slot")
+        // The sidecar is ours, so it is rebuilt in place under the same name —
+        // the stamp, not the path, is what tells the two apart.
+        XCTAssertEqual(first, second)
+        let refreshed = try await probe(second, tools: tools)
+        XCTAssertEqual(refreshed.duration ?? 0, 4, accuracy: 0.35, "the longer source should have replaced it")
     }
 
     func testAMissingSourceFailsBeforeSpawningFFmpeg() async throws {
@@ -254,22 +348,21 @@ final class RemuxServiceIntegrationTests: XCTestCase {
         let source = workspace.appendingPathComponent("broken.mkv")
         try Data(repeating: 0x42, count: 4096).write(to: source)
 
-        let cacheRoot = workspace.appendingPathComponent("cache", isDirectory: true)
-        let service = RemuxService(
-            tools: tools,
-            cache: RemuxCacheStore(root: cacheRoot),
-            capabilities: HostCapabilities.current()
-        )
-
         do {
-            _ = try await service.remux(source: source) { _ in }
+            _ = try await makeService(tools).remux(source: source) { _ in }
             XCTFail("expected a failure")
         } catch {
             // Expected.
         }
-        XCTAssertTrue(
-            RemuxCacheStore(root: cacheRoot).entries().allSatisfy(\.isComplete),
-            "a failed job must not leave a playable-looking cache entry"
+
+        let survivors = try FileManager.default.contentsOfDirectory(atPath: workspace.path)
+        XCTAssertFalse(
+            survivors.contains { $0.hasSuffix(".mp4") || $0.hasSuffix(".mov") },
+            "a failed job must not leave something that looks playable: \(survivors)"
+        )
+        XCTAssertFalse(
+            survivors.contains { $0.contains("partial") },
+            "the scratch file must be cleaned up: \(survivors)"
         )
     }
 
@@ -279,11 +372,17 @@ final class RemuxServiceIntegrationTests: XCTestCase {
         try XCTUnwrap(tools, "ffmpeg/ffprobe not on PATH — skipping integration coverage")
     }
 
+    /// The shipping default: the prepared movie lands beside the source.
     private func makeService(_ tools: ToolPaths) -> RemuxService {
+        makeService(tools, location: .besideSource)
+    }
+
+    private func makeService(_ tools: ToolPaths, location: OutputLocation) -> RemuxService {
         RemuxService(
             tools: tools,
             cache: RemuxCacheStore(root: workspace.appendingPathComponent("cache", isDirectory: true)),
-            capabilities: HostCapabilities.current()
+            capabilities: HostCapabilities.current(),
+            outputLocation: location
         )
     }
 

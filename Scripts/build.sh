@@ -69,22 +69,9 @@ if (( BUNDLE_HELPERS )); then
 fi
 
 echo "==> Signing"
-IDENTITY="${CODESIGN_IDENTITY:--}"
-ENTITLEMENTS="$ROOT/Support/Milktoast.entitlements"
-xattr -cr "$APP"
-
-# Sign inside-out: nested code first, the bundle last.
-for dylib in "$APP"/Contents/Frameworks/*.dylib(N); do
-  codesign --force --timestamp --options runtime --sign "$IDENTITY" "$dylib" >/dev/null
-done
-for helper in "$APP"/Contents/Helpers/*(N); do
-  [[ -f "$helper" ]] || continue
-  codesign --force --timestamp --options runtime \
-    --entitlements "$ENTITLEMENTS" --sign "$IDENTITY" "$helper" >/dev/null
-done
-codesign --force --timestamp --options runtime \
-  --entitlements "$ENTITLEMENTS" --sign "$IDENTITY" "$APP"
-
-codesign --verify --deep --strict "$APP" && echo "    signature OK ($IDENTITY)"
+# Ad-hoc by default: fine locally, rejected by Gatekeeper elsewhere. Release
+# builds go through Scripts/release.sh, which passes a Developer ID identity.
+"$ROOT/Scripts/codesign_app.sh" "$APP" "${CODESIGN_IDENTITY:--}"
+codesign --verify --deep --strict "$APP" && echo "    signature verified"
 
 echo "Built: $APP"

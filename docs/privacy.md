@@ -29,11 +29,14 @@ Privacy & Security.
 
 ## What Milktoast Writes
 
-Prepared movies are written to `~/Library/Caches/io.bino.milktoast/`. These are
-copies of your video's existing streams in a different container. They stay on
-your Mac, are excluded from Time Machine backups, and are deleted automatically
-on a size and age budget you control in Settings → Cache. You can delete them at
-any time with **Empty Cache Now** or `milktoast --clear-cache`.
+Prepared movies are copies of your video's existing streams in a different
+container. By default they are written next to the original file, as
+`Episode.mp4` beside `Episode.mkv`, and they stay there for you to manage;
+Milktoast never overwrites a file it did not create. Settings → Output can move
+them to `~/Library/Caches/io.bino.milktoast/` instead, where they are excluded
+from Time Machine and cleaned up on a budget you control.
+
+Everything stays on your Mac. Nothing is uploaded anywhere.
 
 Preferences are stored locally in the standard macOS defaults database
 (`~/Library/Preferences/io.bino.milktoast.plist`).

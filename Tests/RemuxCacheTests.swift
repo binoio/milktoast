@@ -134,6 +134,19 @@ final class CacheEvictionTests: XCTestCase {
         XCTAssertEqual(plan, ["d", "c", "b"])
     }
 
+    func testCleanupDisabledKeepsFinishedMoviesButStillCollectsLeftovers() {
+        let plan = CacheEviction.plan(
+            entries: [
+                entry("finished", gb: 400, ageDays: 900),
+                entry("half-written", gb: 5, ageDays: 0, complete: false),
+            ],
+            limits: .retainEverything,
+            now: now
+        )
+        XCTAssertEqual(plan, ["half-written"],
+                       "an unplayable leftover is never worth keeping")
+    }
+
     func testProtectedEntryIsNeverEvicted() {
         let plan = CacheEviction.plan(
             entries: [

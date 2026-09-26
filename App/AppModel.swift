@@ -171,7 +171,8 @@ final class AppModel {
             cache: RemuxCacheStore(root: RemuxCacheStore.defaultRoot()),
             capabilities: HostCapabilities.current(),
             options: preferences.remuxOptions,
-            cacheLimits: preferences.cacheLimits
+            cacheLimits: preferences.cacheLimits,
+            outputLocation: preferences.outputLocation
         )
 
         job.phase = .analyzing
@@ -224,8 +225,8 @@ final class AppModel {
             // Only a video re-encode is slow enough to warrant a different
             // verb; an audio conversion still runs at disk speed.
             job.phase = .working(isEncode: plan.requiresVideoEncode)
-        case .reusedCache(let url):
-            job.reusedCache = true
+        case .reusedExisting(let url):
+            job.reusedExisting = true
             job.output = url
             job.fraction = 1
         case .started(let command):

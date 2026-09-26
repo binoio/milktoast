@@ -11,8 +11,8 @@ struct SettingsView: View {
                 .tabItem { Label("Playback", systemImage: "play.rectangle") }
             TrackSettings(preferences: model.preferences)
                 .tabItem { Label("Tracks", systemImage: "square.stack.3d.up") }
-            CacheSettings(model: model)
-                .tabItem { Label("Cache", systemImage: "internaldrive") }
+            OutputSettings(model: model)
+                .tabItem { Label("Output", systemImage: "internaldrive") }
         }
         .frame(width: 430)
     }
@@ -154,7 +154,7 @@ private struct TrackSettings: View {
     }
 }
 
-private struct CacheSettings: View {
+private struct OutputSettings: View {
     let model: AppModel
 
     private var preferences: Preferences { model.preferences }
@@ -162,29 +162,59 @@ private struct CacheSettings: View {
     var body: some View {
         Form {
             Section {
-                LabeledContent("Currently used:", value: model.cacheSizeText)
-                Picker("Keep at most:", selection: binding(\.cacheSizeGB)) {
-                    ForEach([10, 20, 40, 80, 160], id: \.self) { size in
-                        Text("\(size) GB").tag(size)
-                    }
+                Picker("Save prepared movies:", selection: binding(\.outputLocation)) {
+                    Text("Next to the original file").tag(OutputLocation.besideSource)
+                    Text("In Milktoast's cache folder").tag(OutputLocation.cache)
                 }
-                Picker("Discard after:", selection: binding(\.cacheMaxAgeDays)) {
-                    ForEach([1, 3, 7, 14, 30], id: \.self) { days in
-                        Text(days == 1 ? "1 day" : "\(days) days").tag(days)
-                    }
-                }
+                .pickerStyle(.radioGroup)
             } footer: {
-                Text("Prepared movies live in ~/Library/Caches, are excluded from Time Machine, and are cleaned up automatically — at launch, before each job, and when the queue empties. macOS may also reclaim the space on its own when the disk fills. Your original files are never touched.")
+                Text(preferences.outputLocation == .besideSource
+                     ? "Episode.mkv gets an Episode.mp4 beside it, ready to open any time — Milktoast never deletes it, and never overwrites a file it did not create. If the folder is read-only, the cache is used instead."
+                     : "Prepared movies stay out of your movie folders and can be cleaned up on a budget.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            // Cleanup is only meaningful while the cache is the destination.
+            if preferences.outputLocation == .cache {
+                Section("Cleanup") {
+                    Toggle("Delete prepared movies automatically", isOn: binding(\.automaticCacheCleanup))
+                    Picker("Keep at most:", selection: binding(\.cacheSizeGB)) {
+                        ForEach([10, 20, 40, 80, 160], id: \.self) { size in
+                            Text("\(size) GB").tag(size)
+                        }
+                    }
+                    .disabled(!preferences.automaticCacheCleanup)
+                    Picker("Discard after:", selection: binding(\.cacheMaxAgeDays)) {
+                        ForEach([1, 3, 7, 14, 30], id: \.self) { days in
+                            Text(days == 1 ? "1 day" : "\(days) days").tag(days)
+                        }
+                    }
+                    .disabled(!preferences.automaticCacheCleanup)
+                    if !preferences.automaticCacheCleanup {
+                        Text("Prepared movies are kept until you empty the cache yourself. Half-written leftovers are still removed.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
             }
 
             Section {
+                LabeledContent(
+                    preferences.outputLocation == .cache ? "Cache size:" : "Left over from cache mode:",
+                    value: model.cacheSizeText
+                )
                 HStack {
                     Button("Reveal in Finder") { model.revealCache() }
                     Spacer()
                     Button("Empty Cache Now") { model.clearCache() }
                 }
+            } footer: {
+                Text("The cache lives in ~/Library/Caches, is excluded from Time Machine, and may be reclaimed by macOS when the disk fills. Your original files are never touched.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
         }
         .formStyle(.grouped)

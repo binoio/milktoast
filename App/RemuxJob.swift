@@ -40,7 +40,7 @@ final class RemuxJob: Identifiable {
     var speed: Double?
     var plan: RemuxPlan?
     var output: URL?
-    var reusedCache = false
+    var reusedExisting = false
     var commandLine: String?
     var failureDetail: String?
 
@@ -57,7 +57,7 @@ final class RemuxJob: Identifiable {
         case .analyzing:
             return "Analyzing…"
         case .working(let isEncode):
-            if reusedCache { return "Already prepared" }
+            if reusedExisting { return "Already prepared" }
             let verb = isEncode ? "Converting" : "Remuxing"
             guard let fraction else { return "\(verb)…" }
             var text = "\(verb) \(Int(fraction * 100))%"
@@ -71,7 +71,7 @@ final class RemuxJob: Identifiable {
         case .handingOff:
             return "Opening in player…"
         case .playing:
-            return reusedCache ? "Playing (reused earlier remux)" : "Playing"
+            return reusedExisting ? "Playing (already prepared)" : "Playing"
         case .ready:
             return "Ready to open"
         case .failed(let message):

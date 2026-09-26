@@ -60,6 +60,8 @@ final class Preferences {
             Keys.maxVideoBitrateMbps: 20,
             Keys.player: PlayerChoice.quickTimePlayer.storedValue,
             Keys.quitAfterHandoff: true,
+            Keys.outputLocation: OutputLocation.besideSource.rawValue,
+            Keys.automaticCacheCleanup: true,
             Keys.cacheSizeGB: 20,
             Keys.cacheMaxAgeDays: 7,
         ])
@@ -75,6 +77,10 @@ final class Preferences {
         maxVideoBitrateMbps = defaults.integer(forKey: Keys.maxVideoBitrateMbps)
         player = PlayerChoice(storedValue: defaults.string(forKey: Keys.player) ?? "")
         quitAfterHandoff = defaults.bool(forKey: Keys.quitAfterHandoff)
+        outputLocation = OutputLocation(
+            rawValue: defaults.string(forKey: Keys.outputLocation) ?? ""
+        ) ?? .besideSource
+        automaticCacheCleanup = defaults.bool(forKey: Keys.automaticCacheCleanup)
         cacheSizeGB = defaults.integer(forKey: Keys.cacheSizeGB)
         cacheMaxAgeDays = defaults.integer(forKey: Keys.cacheMaxAgeDays)
     }
@@ -90,6 +96,8 @@ final class Preferences {
         static let maxVideoBitrateMbps = "maxVideoBitrateMbps"
         static let player = "player"
         static let quitAfterHandoff = "quitAfterHandoff"
+        static let outputLocation = "outputLocation"
+        static let automaticCacheCleanup = "automaticCacheCleanup"
         static let cacheSizeGB = "cacheSizeGB"
         static let cacheMaxAgeDays = "cacheMaxAgeDays"
     }
@@ -104,6 +112,8 @@ final class Preferences {
     var maxVideoBitrateMbps: Int { didSet { defaults.set(maxVideoBitrateMbps, forKey: Keys.maxVideoBitrateMbps) } }
     var player: PlayerChoice { didSet { defaults.set(player.storedValue, forKey: Keys.player) } }
     var quitAfterHandoff: Bool { didSet { defaults.set(quitAfterHandoff, forKey: Keys.quitAfterHandoff) } }
+    var outputLocation: OutputLocation { didSet { defaults.set(outputLocation.rawValue, forKey: Keys.outputLocation) } }
+    var automaticCacheCleanup: Bool { didSet { defaults.set(automaticCacheCleanup, forKey: Keys.automaticCacheCleanup) } }
     var cacheSizeGB: Int { didSet { defaults.set(cacheSizeGB, forKey: Keys.cacheSizeGB) } }
     var cacheMaxAgeDays: Int { didSet { defaults.set(cacheMaxAgeDays, forKey: Keys.cacheMaxAgeDays) } }
 
@@ -120,8 +130,15 @@ final class Preferences {
         )
     }
 
+    /// The budget actually applied.
+    ///
+    /// Cleanup can only be switched off while the cache is in use; with the
+    /// default sidecar output there is no cache to manage, so the standard
+    /// budget still applies and copies left over from cache mode age out.
     var cacheLimits: CacheLimits {
-        CacheLimits(
+        guard outputLocation == .cache else { return .default }
+        guard automaticCacheCleanup else { return .retainEverything }
+        return CacheLimits(
             maxTotalBytes: Int64(max(1, cacheSizeGB)) * 1024 * 1024 * 1024,
             maxAge: TimeInterval(max(1, cacheMaxAgeDays)) * 24 * 60 * 60
         )

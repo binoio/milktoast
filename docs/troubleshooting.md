@@ -27,7 +27,8 @@ attribute. For a local build:
 xattr -cr /Applications/Milktoast.app
 ```
 
-For distribution, build with `Scripts/build_and_notarize.sh` instead.
+Release builds are signed and notarized by `Scripts/release.sh`, so a downloaded
+Milktoast opens without this step.
 
 ## "Milktoast could not find ffmpeg"
 
@@ -63,45 +64,33 @@ The source video is in a codec QuickTime cannot decode (VP9, 10-bit H.264, AV1
 on macOS 13), so it is being re-encoded rather than copied. `milktoast --plan` on the
 file reports `Mode: video re-encode required (slow)` when this is the case.
 
-## What happens to the prepared .mp4 files?
+## Where does the prepared .mp4 go, and is it cleaned up?
 
-They are cached so that reopening a movie is instant, and they are cleaned up
-automatically. Milktoast applies the cache budget at launch, before each remux,
-and again once its queue is empty: partial leftovers go first, then anything
-past the age limit, then the least recently used until the size cap is met.
-Defaults are 7 days and 20 GB; both are in Settings → Cache.
+By default it is written next to the original: `Episode.mkv` gets an
+`Episode.mp4` beside it, and it stays there. Milktoast does not delete files it
+puts in your folders — that is yours to manage, the same as any other movie.
 
-The cache sits in `~/Library/Caches/io.bino.milktoast`, which macOS may reclaim
-on its own when the disk fills, and it is excluded from Time Machine backups.
-Your original `.mkv` is never touched.
+It will never overwrite something it did not create. Each movie it writes is
+stamped with an extended attribute naming the source and settings behind it. An
+unstamped `Episode.mp4` already in the folder is left alone and the output
+becomes `Episode (Milktoast).mp4`.
 
-To reclaim the space right now:
+If you would rather they were managed for you, Settings → Output →
+**"In Milktoast's cache folder"**. That mode adds a **Cleanup** section with an
+on/off toggle and size and age budgets (20 GB and 7 days by default). With
+cleanup on, Milktoast applies the budget at launch, before each job, and when
+its queue empties. With it off, prepared movies are kept until you empty the
+cache yourself; half-written leftovers are still removed.
+
+Either way:
 
 ```sh
-milktoast --cache-info     # where it is and how big
-milktoast --clear-cache    # delete every prepared movie
+milktoast --cache-info     # where the cache is and how big
+milktoast --clear-cache    # delete every cached movie
 ```
 
-or Settings → Cache → **Empty Cache Now**. Deleting a cached movie only means
-the next open of that file takes a second or two again.
-
-## Milktoast does not appear in System Settings → Privacy & Security
-
-That is expected, and it is a good sign. Opening a movie from Finder — by
-double-clicking it, dragging it onto Milktoast, or choosing it in the open panel —
-grants Milktoast access to that one file through Launch Services. No blanket
-permission is requested, so no entry is created.
-
-Milktoast appears under **Files and Folders** only once macOS actually has to ask,
-which in practice means a movie on an external drive or a network share. The
-explanations shown in those prompts come from the `NS*UsageDescription` keys in
-`Support/Info.plist`.
-
-If a movie on an external or network volume fails to open, check **Files and
-Folders** and **Full Disk Access** there. Note that a locally built, ad-hoc
-signed Milktoast.app gets a new code identity on every rebuild, so any grant you give
-one build will not carry over to the next — a notarized build signed with a
-stable Developer ID identity keeps its grants.
+Deleting a prepared movie only means the next open of that file takes a second
+or two again. Your original `.mkv` is never touched.
 
 ## I would rather open the movie myself
 

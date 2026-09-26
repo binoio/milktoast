@@ -3,8 +3,8 @@ import Foundation
 public enum RemuxEvent: Sendable {
     case analyzing
     case planned(RemuxPlan)
-    /// A finished remux for this exact source and settings already existed.
-    case reusedCache(URL)
+    /// A finished movie for this exact source and settings was already in place.
+    case reusedExisting(URL)
     case started(command: String)
     case progress(RemuxProgress, fraction: Double?)
     case finished(URL)
@@ -12,6 +12,7 @@ public enum RemuxEvent: Sendable {
 
 public enum RemuxError: Error, CustomStringConvertible {
     case sourceUnreadable(URL)
+    case noAvailableOutputName(URL)
     case probeFailed(String)
     case probeUndecodable(String)
     case planning(RemuxPlannerError)
@@ -22,6 +23,11 @@ public enum RemuxError: Error, CustomStringConvertible {
         switch self {
         case .sourceUnreadable(let url):
             return "Cannot read \(url.lastPathComponent)."
+        case .noAvailableOutputName(let url):
+            return """
+            Could not find a free name next to \(url.lastPathComponent). \
+            Milktoast will not overwrite a file it did not create.
+            """
         case .probeFailed(let message):
             return "ffprobe could not analyze the file.\n\(message)"
         case .probeUndecodable(let message):
@@ -50,19 +56,22 @@ public struct RemuxService: Sendable {
     public let capabilities: PlaybackCapabilities
     public let options: RemuxOptions
     public let cacheLimits: CacheLimits
+    public let outputLocation: OutputLocation
 
     public init(
         tools: ToolPaths,
         cache: RemuxCacheStore,
         capabilities: PlaybackCapabilities,
         options: RemuxOptions = .default,
-        cacheLimits: CacheLimits = .default
+        cacheLimits: CacheLimits = .default,
+        outputLocation: OutputLocation = .besideSource
     ) {
         self.tools = tools
         self.cache = cache
         self.capabilities = capabilities
         self.options = options
         self.cacheLimits = cacheLimits
+        self.outputLocation = outputLocation
     }
 
     public func probe(_ source: URL) async throws -> ProbeResult {
@@ -94,7 +103,7 @@ public struct RemuxService: Sendable {
         }
     }
 
-    /// Produces a QuickTime-playable `.mov` for `source` and returns its URL.
+    /// Produces a QuickTime-playable movie for `source` and returns its URL.
     public func remux(
         source: URL,
         emit: @escaping @Sendable (RemuxEvent) -> Void
@@ -104,33 +113,48 @@ public struct RemuxService: Sendable {
         }
 
         let fingerprint = try cache.fingerprint(of: source)
+        let stamp = RemuxCacheKey.digest(source: fingerprint, options: options)
+        let folder = source.deletingLastPathComponent()
 
-        if let existing = cache.completedOutput(for: fingerprint, options: options) {
-            cache.touch(directory: cache.directory(for: fingerprint, options: options))
-            emit(.reusedCache(existing))
+        // A movie can live on a read-only disc, a locked share, or someone else's
+        // home directory. Fall back rather than fail.
+        var placement = outputLocation
+        var placementWarning: String?
+        if placement == .besideSource, !FileManager.default.isWritableFile(atPath: folder.path) {
+            placement = .cache
+            placementWarning = "\(folder.lastPathComponent) is not writable — kept the prepared movie in Milktoast's cache instead."
+        }
+
+        // Fast path: a finished movie for this exact source and these exact
+        // settings is already sitting where we would put one.
+        if let existing = existingOutput(source: source, fingerprint: fingerprint, stamp: stamp, placement: placement) {
+            if placement == .cache {
+                cache.touch(directory: cache.directory(for: fingerprint, options: options))
+            }
+            emit(.reusedExisting(existing))
             emit(.finished(existing))
             return existing
         }
 
         emit(.analyzing)
         let probeResult = try await probe(source)
-        let remuxPlan = try plan(for: probeResult)
+        var remuxPlan = try plan(for: probeResult)
+        if let placementWarning {
+            remuxPlan.warnings.append(.init(.warning, placementWarning))
+        }
         emit(.planned(remuxPlan))
 
-        // Make room before writing, but never evict the entry we are about to fill.
-        let directoryName = RemuxCacheKey.directoryName(source: fingerprint, options: options)
-        cache.evict(limits: cacheLimits, protecting: [directoryName])
-
-        let directory = try cache.prepareDirectory(for: fingerprint, options: options)
-        let output = cache.outputURL(
-            for: fingerprint,
-            options: options,
+        let destination = try makeDestination(
+            source: source,
+            fingerprint: fingerprint,
+            stamp: stamp,
+            placement: placement,
             container: remuxPlan.container
         )
 
         let arguments = FFmpegCommand.remuxArguments(
             input: source.path,
-            output: output.path,
+            output: destination.workURL.path,
             plan: remuxPlan,
             options: options
         )
@@ -150,22 +174,124 @@ public struct RemuxService: Sendable {
                 }
             )
         } catch {
-            cache.discard(directory: directory)
+            destination.discard()
             throw error
         }
 
         guard result.succeeded else {
-            cache.discard(directory: directory)
+            destination.discard()
             throw RemuxError.ffmpegFailed(exitCode: result.exitCode, standardError: result.standardError)
         }
-        guard FileManager.default.fileExists(atPath: output.path) else {
-            cache.discard(directory: directory)
+        guard FileManager.default.fileExists(atPath: destination.workURL.path) else {
+            destination.discard()
             throw RemuxError.outputMissing
         }
 
-        try cache.markComplete(directory: directory, sourcePath: source.path)
-        emit(.finished(output))
-        return output
+        try destination.finalize(stamp: stamp, sourcePath: source.path, cache: cache)
+        emit(.finished(destination.finalURL))
+        return destination.finalURL
+    }
+
+    // MARK: - Destinations
+
+    /// Where ffmpeg writes, where the result ends up, and how to tidy up either way.
+    struct Destination {
+        var workURL: URL
+        var finalURL: URL
+        /// Set when the cache owns this result; nil for a sidecar.
+        var cacheDirectory: URL?
+
+        func discard() {
+            if let cacheDirectory {
+                try? FileManager.default.removeItem(at: cacheDirectory)
+            } else {
+                try? FileManager.default.removeItem(at: workURL)
+            }
+        }
+
+        func finalize(stamp: String, sourcePath: String, cache: RemuxCacheStore) throws {
+            guard let cacheDirectory else {
+                // Same-directory rename is atomic, so the finished name never
+                // exists in a half-written state.
+                if workURL != finalURL {
+                    try? FileManager.default.removeItem(at: finalURL)
+                    try FileManager.default.moveItem(at: workURL, to: finalURL)
+                }
+                FileStamp.write(stamp, at: finalURL.path)
+                return
+            }
+            try cache.markComplete(directory: cacheDirectory, sourcePath: sourcePath)
+        }
+    }
+
+    private func makeDestination(
+        source: URL,
+        fingerprint: SourceFingerprint,
+        stamp: String,
+        placement: OutputLocation,
+        container: OutputContainer
+    ) throws -> Destination {
+        switch placement {
+        case .besideSource:
+            let folder = source.deletingLastPathComponent()
+            let decision = SidecarPlanner.decide(
+                sourceName: source.lastPathComponent,
+                container: container,
+                expectedStamp: stamp,
+                inspect: { inspectSidecar(folder.appendingPathComponent($0)) }
+            )
+            switch decision {
+            case .noRoom:
+                throw RemuxError.noAvailableOutputName(source)
+            case .reuse(let name), .write(let name):
+                let finalURL = folder.appendingPathComponent(name)
+                let workURL = folder.appendingPathComponent(SidecarNaming.partial(for: name))
+                try? FileManager.default.removeItem(at: workURL)
+                return Destination(workURL: workURL, finalURL: finalURL, cacheDirectory: nil)
+            }
+
+        case .cache:
+            let directoryName = RemuxCacheKey.directoryName(source: fingerprint, options: options)
+            cache.evict(limits: cacheLimits, protecting: [directoryName])
+            let directory = try cache.prepareDirectory(for: fingerprint, options: options)
+            let output = cache.outputURL(for: fingerprint, options: options, container: container)
+            return Destination(workURL: output, finalURL: output, cacheDirectory: directory)
+        }
+    }
+
+    /// A finished movie already in the right place for this source and settings.
+    private func existingOutput(
+        source: URL,
+        fingerprint: SourceFingerprint,
+        stamp: String,
+        placement: OutputLocation
+    ) -> URL? {
+        switch placement {
+        case .cache:
+            return cache.completedOutput(for: fingerprint, options: options)
+        case .besideSource:
+            // The container is not known until the source is probed, so check the
+            // names both containers would have produced.
+            let folder = source.deletingLastPathComponent()
+            for container in [OutputContainer.mp4, .mov] {
+                let decision = SidecarPlanner.decide(
+                    sourceName: source.lastPathComponent,
+                    container: container,
+                    expectedStamp: stamp,
+                    inspect: { inspectSidecar(folder.appendingPathComponent($0)) }
+                )
+                if case .reuse(let name) = decision {
+                    return folder.appendingPathComponent(name)
+                }
+            }
+            return nil
+        }
+    }
+
+    private func inspectSidecar(_ url: URL) -> SidecarFileState {
+        guard FileManager.default.fileExists(atPath: url.path) else { return .absent }
+        guard let stamp = FileStamp.read(at: url.path) else { return .foreign }
+        return .ours(stamp: stamp)
     }
 }
 

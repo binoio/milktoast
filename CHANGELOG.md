@@ -16,10 +16,16 @@ Matroska file, get it playing in QuickTime Player.
 - Playback choices: QuickTime Player, the system default, another app, or
   prepare-only — which stops after the remux and offers an explicit
   "Open in QuickTime" button instead of launching anything.
-- Content-addressed cache with LRU and age eviction — applied at launch, before
-  each job, and when the queue empties — so reopening a file is instant, a
-  partial remux is never handed to a player, and prepared copies do not
-  accumulate. Defaults to 7 days / 20 GB and is excluded from Time Machine.
+- Prepared movies are written next to the original by default (`Episode.mkv` →
+  `Episode.mp4`), stamped with an extended attribute so Milktoast can recognise
+  and reuse its own output, rebuild it when the source or settings change, and
+  never overwrite a file someone else put there. ffmpeg writes to a hidden
+  scratch file that is renamed into place only on success.
+- Settings → Output can keep prepared movies in a managed cache instead. That
+  mode is content-addressed with LRU and age eviction — applied at launch,
+  before each job, and when the queue empties — and is where the cleanup toggle
+  and the size/age budgets live (20 GB / 7 days by default). The cache is
+  excluded from Time Machine.
 - ffmpeg and ffprobe bundled into the app with their libraries relocated and
   re-signed, so a notarized Milktoast.app has no external dependencies.
 - 105 tests, including real ffmpeg round-trips, runnable in a Linux container.

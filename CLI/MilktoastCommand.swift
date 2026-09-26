@@ -16,6 +16,7 @@ USAGE:
   milktoast --clear-cache                delete every cached remux
 
 OPTIONS:
+  --output <where>       beside | cache  (default: beside the source file)
   --player <name>        player app to open with (default: QuickTime Player)
   --no-open              alias for --remux-only
   --no-subtitles         skip subtitle conversion
@@ -40,6 +41,7 @@ struct Invocation {
     var files: [String] = []
     var player = "QuickTime Player"
     var options = RemuxOptions.default
+    var outputLocation = OutputLocation.besideSource
     var quiet = false
 }
 
@@ -67,6 +69,14 @@ func parse(_ arguments: [String]) throws -> Invocation {
             invocation.options.includeAllAudioTracks = false
         case "--no-hardware":
             invocation.options.preferHardwareEncoding = false
+        case "--output":
+            index += 1
+            guard index < arguments.count else { throw CLIError.missingValue(argument) }
+            switch arguments[index].lowercased() {
+            case "beside", "besidesource", "source": invocation.outputLocation = .besideSource
+            case "cache": invocation.outputLocation = .cache
+            default: throw CLIError.missingValue(argument)
+            }
         case "--player":
             index += 1
             guard index < arguments.count else { throw CLIError.missingValue(argument) }
@@ -238,7 +248,8 @@ func run() async -> Int32 {
         tools: tools,
         cache: store,
         capabilities: HostCapabilities.current(),
-        options: invocation.options
+        options: invocation.options,
+        outputLocation: invocation.outputLocation
     )
 
     var status: Int32 = 0
@@ -261,8 +272,8 @@ func run() async -> Int32 {
                     standardError("Analyzing \(source.lastPathComponent)…")
                 case .planned(let plan):
                     standardError(describe(plan))
-                case .reusedCache:
-                    standardError("Reusing cached remux.")
+                case .reusedExisting(let url):
+                    standardError("Already prepared — reusing \(url.lastPathComponent).")
                 case .started:
                     break
                 case .progress(_, let fraction):

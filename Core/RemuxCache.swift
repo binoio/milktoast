@@ -87,6 +87,15 @@ public struct CacheLimits: Sendable, Equatable {
         maxTotalBytes: 20 * 1024 * 1024 * 1024,  // 20 GB
         maxAge: 7 * 24 * 60 * 60                 // 7 days
     )
+
+    /// Automatic cleanup turned off: complete movies are kept indefinitely.
+    ///
+    /// Half-written leftovers are still collected — they are unplayable by
+    /// definition, so keeping them would only waste disk.
+    public static let retainEverything = CacheLimits(
+        maxTotalBytes: .max,
+        maxAge: .greatestFiniteMagnitude
+    )
 }
 
 /// Decides which cache directories to remove. Split out from the filesystem so
